@@ -121,8 +121,13 @@ reg recovery_boot_req;
 reg [31:0] watchdog_counter;
 reg [15:0] reset_counter;
 reg [1:0]  refresh_state;
-reg        refresh_valid;
+reg        refresh_toggle;
 reg        locked;
+reg        refresh_toggle_sync1;
+reg        refresh_toggle_sync2;
+reg        refresh_toggle_sync2_d;
+
+wire       refresh_valid;
 
 //--------------------------------------------------
 // Reset Scope Output
@@ -235,8 +240,7 @@ always @(posedge pclk or negedge presetn) begin
                 WDT_BOOT_STATUS_ADDR: begin
                     if (pwdata[0])
                         prev_reset_wdt <= 1'b0;
-
-                    recovery_boot_req <= pwdata[1];
+                        recovery_boot_req <= pwdata[1];
                 end
 
                 //------------------------------------------
@@ -358,11 +362,11 @@ always @(posedge pclk or negedge presetn) begin
 
     if (!presetn) begin
         refresh_state <= 2'd0;
-        refresh_valid <= 1'b0;
+        refresh_toggle <= 1'b0;
     end
     else begin
 
-        refresh_valid <= 1'b0;
+       // refresh_toggle <= 1'b0;
 
         if (apb_write && paddr == WDT_REFRESH_ADDR) begin
 
@@ -379,7 +383,7 @@ always @(posedge pclk or negedge presetn) begin
 
                 2'd1: begin
                     if (pwdata == REFRESH_KEY2) begin
-                        refresh_valid <= 1'b1;
+                        refresh_toggle <= ~refresh_toggle;
                         refresh_state <= 2'd0;
                     end
                     else begin
@@ -397,11 +401,35 @@ always @(posedge pclk or negedge presetn) begin
     end
 end
 
+//------------------------------------------
+//synchronizer block
+//-------------------------------------------
+always@(posedge wdt_clk or negedge wdt_rstn) begin
+if(!wdt_rstn) begin
+        refresh_toggle_sync1   <= 1'b0;
+        refresh_toggle_sync2   <= 1'b0;
+        refresh_toggle_sync2_d <= 1'b0;
+    end
+    else begin
+
+            refresh_toggle_sync1   <= refresh_toggle;
+            refresh_toggle_sync2   <= refresh_toggle_sync1;
+            refresh_toggle_sync2_d <= refresh_toggle_sync2;
+        end   
+
+end
+
+assign refresh_valid = refresh_toggle_sync2 ^ refresh_toggle_sync2_d;
+
+
 //--------------------------------------------------
 // Watchdog Counter Logic
 //--------------------------------------------------
 wire freeze_condition;
 assign freeze_condition = dbg_freeze_en & (cpu_dbg_halt | dbg_freeze);
+
+reg counter_loaded;
+reg timeout_active;
 
 always @(posedge wdt_clk or negedge wdt_rstn) begin
 
@@ -411,6 +439,8 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         wdt_timeout      <= 1'b0;
         wdt_reset        <= 1'b0;
         reset_counter    <= 16'h0;
+        counter_loaded   <= 1'b0;
+        timeout_active   <= 1'b0;
 
     end
     else begin
@@ -418,7 +448,8 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         //----------------------------------------------
         // Default
         //----------------------------------------------
-        wdt_timeout <= 1'b0;
+        wdt_timeout     <= 1'b0;
+       // counter_loaded  <= 1'b0;
 
         //----------------------------------------------
         // Reset Pulse Generation
@@ -442,8 +473,10 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
             //------------------------------------------
             // Initial Load
             //------------------------------------------
-            if (watchdog_counter == 32'h0 && !wdt_reset)
+            if (!counter_loaded) begin
                 watchdog_counter <= timeout_value;
+                counter_loaded   <= 1'b1;
+                end
 
             //------------------------------------------
             // Refresh Logic
@@ -465,6 +498,8 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
                 end
                 else begin
                     watchdog_counter <= timeout_value;
+                    timeout_active   <= 1'b0;
+                    timeout_flag     <= 1'b0;
                 end
             end
 
@@ -478,8 +513,9 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
             //------------------------------------------
             // Timeout Condition
             //------------------------------------------
-            else begin
+            else if (!timeout_active) begin
 
+                timeout_active  <= 1'b1;
                 timeout_flag    <= 1'b1;
                 wdt_timeout     <= 1'b1;
                 wdt_reset_cause <= 1'b1;
