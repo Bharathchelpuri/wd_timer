@@ -172,7 +172,8 @@ reg cfg_sync2_d;
 reg [31:0] timeout_value_wdt;
 reg [31:0] window_value_wdt;
 reg [15:0] reset_cycles_wdt;
-//reg [3:0]  status_clear_req_wdt;
+reg [2:0]  status_clear_req_wdt;
+reg [2:0]  status_clear_req_wdt_d;
 
 //////////////////////////////////////////////
 
@@ -186,9 +187,9 @@ reg  refresh_toggle_sync2_d;
 //reg  clr_window_violation_sync1;
 //reg  clr_window_violation_sync2;
 
-reg status_clear_sync1;
-reg status_clear_sync2;
-reg status_clear_sync2_d;
+//reg status_clear_sync1;
+//reg status_clear_sync2;
+//reg status_clear_sync2_d;
 
 reg prev_reset_wdt_sync1;
 reg prev_reset_wdt_sync2;
@@ -205,14 +206,14 @@ reg reset_issued_wdt;
 reg prev_reset_wdt_wdt;
 //reg refresh_error_wdt;
 reg cfg_toggle;
-reg status_clear_toggle;
-reg [2:0] status_clear_req;
+//reg status_clear_toggle;
+//reg [2:0] status_clear_req;
 
 ////////////////////////////////////////////////////
 
 wire refresh_valid;
 wire cfg_update;
-wire status_clear_pulse;
+//wire status_clear_pulse;
 wire freeze_condition;
 wire prev_reset_wdt_pulse;
 
@@ -232,6 +233,22 @@ always @(posedge pclk or negedge presetn) begin
     else if (cpu_commit_valid)
         last_pc <= cpu_commit_pc;
 end
+
+wire status_wc;
+
+reg status_toggle1;
+reg status_toggle2;
+reg status_toggle3;
+
+wire clr_f1;
+wire clr_f2;
+wire clr_f3;
+
+reg [1:0] sync_f1, sync_f2, sync_f3;
+reg dly_f1, dly_f2, dly_f3;
+
+assign status_wc = apb_write && (paddr == WDT_STATUS_ADDR);
+
 
 
 //--------------------------------------------------
@@ -262,8 +279,13 @@ always @(posedge pclk or negedge presetn) begin
     	refresh_state	      <= 2'd0;
         refresh_toggle 	      <= 1'b0;
         cfg_toggle            <= 1'b0;
-        status_clear_req      <= 4'b0;
-        status_clear_toggle   <= 1'b0;
+        //status_clear_req      <= 3'b0;
+        //status_clear_toggle   <= 1'b0;
+	 status_toggle1	  	<= 1'b0;
+	 status_toggle2	  	<= 1'b0;
+	 status_toggle3	  	<= 1'b0;
+
+
 
 
     end
@@ -310,11 +332,15 @@ always @(posedge pclk or negedge presetn) begin
         //--------------------------------------------------
         // Status W1C
         //--------------------------------------------------
-        if (apb_write && paddr == WDT_STATUS_ADDR) begin
-                status_clear_req[0]    <= pwdata[0];
-                status_clear_req[1]    <= pwdata[1];
-                status_clear_req[2]    <= pwdata[3];
-                status_clear_toggle    <= ~status_clear_toggle;
+        if (status_wc) begin
+                //status_clear_req[0]    <= pwdata[0];
+               // status_clear_req[1]    <= pwdata[1];
+                //status_clear_req[2]    <= pwdata[3];
+		if(pwdata[0]) status_toggle1 <= ~status_toggle1;
+		if(pwdata[1]) status_toggle2 <= ~status_toggle2;
+		if(pwdata[3]) status_toggle3 <= ~status_toggle3;
+
+               // status_clear_toggle    <= ~status_clear_toggle;
 		        if(pwdata[2]) 
 		            refresh_error	    <= 1'b0;
                 end
@@ -551,12 +577,39 @@ assign refresh_valid = refresh_toggle_sync2 ^ refresh_toggle_sync2_d;
 
 assign cfg_update = cfg_sync2 ^ cfg_sync2_d;
 
-assign status_clear_pulse = status_clear_sync2 ^ status_clear_sync2_d;
+//assign status_clear_pulse = status_clear_sync2 ^ status_clear_sync2_d;
 
 assign prev_reset_wdt_pulse = prev_reset_wdt_sync2 ^ prev_reset_wdt_sync2_d;
 
+assign clr_f1 = dly_f1 ^ sync_f1[1];
+
+assign clr_f2 = dly_f2 ^ sync_f2[1];
+
+assign clr_f3 = dly_f3 ^ sync_f3[1];
 
 ///////////////////////////////////////////////////////////////////////////////
+
+always @(posedge wdt_clk or negedge wdt_rstn) begin
+ if(!wdt_rstn) begin
+	sync_f1 <= 2'b00;
+	sync_f2 <= 2'b00;
+	sync_f3 <= 2'b00;
+
+	dly_f1 <= 1'b0;
+	dly_f2 <= 1'b0;
+	dly_f3 <= 1'b0;
+
+end
+else begin
+	sync_f1 <= {sync_f1[0], status_toggle1};
+	sync_f2 <= {sync_f2[0], status_toggle2};
+	sync_f3 <= {sync_f3[0], status_toggle3};
+
+	dly_f1 <= sync_f1[1];
+	dly_f2 <= sync_f2[1];
+	dly_f3 <= sync_f3[1];
+end
+end
 
 //------------------------------------------
 //synchronizer block
@@ -579,9 +632,9 @@ if(!wdt_rstn) begin
             dbg_freeze_en_meta     <= 1'b0;
             dbg_freeze_en_wdt      <= 1'b0;
 
-            status_clear_sync1     <= 1'b0;
-            status_clear_sync2     <= 1'b0;
-            status_clear_sync2_d   <= 1'b0;
+           // status_clear_sync1     <= 1'b0;
+           // status_clear_sync2     <= 1'b0;
+           // status_clear_sync2_d   <= 1'b0;
 
             cfg_sync1              <= 1'b0;
             cfg_sync2              <= 1'b0;
@@ -621,9 +674,9 @@ if(!wdt_rstn) begin
            cfg_sync2              <= cfg_sync1;
            cfg_sync2_d            <= cfg_sync2;
 
-           status_clear_sync1     <= status_clear_toggle;
-           status_clear_sync2     <= status_clear_sync1;
-           status_clear_sync2_d   <= status_clear_sync2;
+           //status_clear_sync1     <= status_clear_toggle;
+           //status_clear_sync2     <= status_clear_sync1;
+           //status_clear_sync2_d   <= status_clear_sync2;
 
            prev_reset_wdt_sync1   <= prev_reset_wdt_pcl;
 	       prev_reset_wdt_sync2   <= prev_reset_wdt_sync1;
@@ -645,7 +698,7 @@ always@(posedge wdt_clk or negedge wdt_rstn) begin
             timeout_value_wdt       <= 32'h0000FFFF;
             window_value_wdt        <= 32'h00000000;
             reset_cycles_wdt        <= 16'd32;
-            //status_clear_req_wdt    <= 4'b0;
+           // status_clear_req_wdt    <= 3'b0;
 
         end
 
@@ -657,7 +710,7 @@ always@(posedge wdt_clk or negedge wdt_rstn) begin
                 end
           //  if(status_clear_pulse) begin
              //   status_clear_req_wdt <= status_clear_req;
-           //     end
+               // end
 
             end
 end
@@ -683,6 +736,7 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         reset_issued_wdt     <= 1'b0;
         prev_reset_wdt_wdt   <= 1'b0;
 	//refresh_error_wdt    <= 1'b0;
+//	status_clear_req_wdt_d <= 3'b0;
 
        
     end
@@ -692,18 +746,21 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         // Default
         //----------------------------------------------
         wdt_timeout      <= 1'b0;
+	
+//	status_clear_req_wdt_d <= status_clear_req_wdt;
 
-        if(status_clear_pulse) begin
-            if(status_clear_req[0])
+       // if(status_clear_pulse) begin
+            if(clr_f1) begin
                 timeout_flag_wdt <= 1'b0;
+		end
 
-             if(status_clear_req[1])
+             if(clr_f2) begin
                  window_violation_wdt <= 1'b0;
+		end
 
-             if(status_clear_req[2])
+             if(clr_f3) begin
                  reset_issued_wdt <=1'b0;
-                 
-            end
+                  end
 
             if(prev_reset_wdt_pulse)
                 prev_reset_wdt_wdt <= 1'b0;
