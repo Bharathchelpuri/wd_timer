@@ -2,21 +2,4 @@
 // File created by:  irun
 // Do not modify this file
 
-s1::(12Feb2019:01:35:59):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s2::(12Feb2019:02:10:47):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s3::(12Feb2019:02:13:02):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s4::(12Feb2019:02:20:08):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s5::(12Feb2019:02:20:54):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s6::(12Feb2019:04:49:55):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s7::(12Feb2019:04:55:23):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s8::(12Feb2019:04:56:13):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s9::(12Feb2019:04:57:23):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s10::(12Feb2019:04:57:56):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s11::(13Feb2019:00:09:15):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s12::(13Feb2019:02:23:04):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s13::(13Feb2019:02:28:23):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s14::(13Feb2019:21:03:16):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s15::(13Feb2019:22:05:11):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s16::(13Feb2019:22:16:10):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s17::(13Feb2019:22:45:27):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
-s18::(13Feb2019:22:46:01):( irun -access +rwc watchdog_timer.sv wd_tb.sv )
+s1::(15Feb2019:02:22:18):( irun -access +rwc watchdog_timer.sv wd_tb.sv )

@@ -1,5 +1,5 @@
 irun(64): 15.20-s051: (c) Copyright 1995-2018 Cadence Design Systems, Inc.
-TOOL:	irun(64)	15.20-s051: Started on Feb 13, 2019 at 22:46:01 IST
+TOOL:	irun(64)	15.20-s051: Started on Feb 15, 2019 at 02:22:18 IST
 irun
 	-access +rwc
 	watchdog_timer.sv
@@ -28,9 +28,6 @@ irun: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,15): cds.lib Permission denied '
 DEFINE rfLib_new	/home/install/FOUNDRY/rfLib_new
 |
 irun: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,19): cds.lib Invalid path '/home/install/FOUNDRY/rfLib_new' (cds.lib command ignored).
-Recompiling... reason: file './wd_tb.sv' is newer than expected.
-	expected: Wed Feb 13 22:45:25 2019
-	actual:   Wed Feb 13 22:46:00 2019
 DEFINE gpdk045		$ANALOG/45nm/gpdk045		
 |
 irun: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,15): cds.lib Permission denied '/tools/cadence/FOUNDRY/analog/45nm/gpdk045' (cds.lib command ignored).
@@ -43,6 +40,9 @@ ncvlog: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,15): cds.lib Permission denied
 DEFINE rfLib_new	/home/install/FOUNDRY/rfLib_new
 |
 ncvlog: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,19): cds.lib Invalid path '/home/install/FOUNDRY/rfLib_new' (cds.lib command ignored).
+file: watchdog_timer.sv
+	module worklib.watchdog_timer:sv
+		errors: 0, warnings: 0
 file: wd_tb.sv
 	module worklib.tb_watchdog_timer:sv
 		errors: 0, warnings: 0
@@ -79,19 +79,21 @@ ncvlog_cg: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,15): cds.lib Permission den
 DEFINE rfLib_new	/home/install/FOUNDRY/rfLib_new
 |
 ncvlog_cg: *W,DLCPTH (/tools/cadence/FOUNDRY/cds.lib,19): cds.lib Invalid path '/home/install/FOUNDRY/rfLib_new' (cds.lib command ignored).
-		worklib.tb_watchdog_timer:sv <0x622da371>
-			streams:  26, words: 51061
+		worklib.tb_watchdog_timer:sv <0x29162730>
+			streams:  26, words: 23677
+		worklib.watchdog_timer:sv <0x0d7a1ebe>
+			streams:  63, words: 30947
 	Building instance specific data structures.
 	Loading native compiled code:     .................... Done
 	Design hierarchy summary:
 		              Instances  Unique
 		Modules:              2       2
-		Registers:           51      51
-		Scalar wires:        18       -
+		Registers:           85      85
+		Scalar wires:        20       -
 		Vectored wires:       5       -
-		Always blocks:        8       8
+		Always blocks:        9       9
 		Initial blocks:       4       4
-		Cont. assignments:    3       5
+		Cont. assignments:    6       7
 		Pseudo assignments:  13      13
 	Writing initial simulation snapshot: worklib.tb_watchdog_timer:sv
 DEFINE gpdk045		$ANALOG/45nm/gpdk045		
@@ -108,121 +110,60 @@ ncsim> run
 [60] COUNT=0 TIMEOUT=0 RESET=0
 [100] COUNT=0 TIMEOUT=0 RESET=0
 [140] COUNT=0 TIMEOUT=0 RESET=0
-
-==========================
-TC1 : RESET VALUES
-==========================
-CTRL    = 000000ca
 [180] COUNT=0 TIMEOUT=0 RESET=0
-TIMEOUT = 0000ffff
-
-==========================
-TC2 : APB R/W
-==========================
 [220] COUNT=0 TIMEOUT=0 RESET=0
 [260] COUNT=0 TIMEOUT=0 RESET=0
-PASS : APB WRITE/READ
-
-==========================
-TC3 : ENABLE WDT
-==========================
 [300] COUNT=0 TIMEOUT=0 RESET=0
-[340] COUNT=20 TIMEOUT=0 RESET=0
-[380] COUNT=19 TIMEOUT=0 RESET=0
-[420] COUNT=18 TIMEOUT=0 RESET=0
-[460] COUNT=17 TIMEOUT=0 RESET=0
-
-==========================
-TC4 : VALID REFRESH
-==========================
-[500] COUNT=16 TIMEOUT=0 RESET=0
-[540] COUNT=15 TIMEOUT=0 RESET=0
-[580] COUNT=14 TIMEOUT=0 RESET=0
-[620] COUNT=13 TIMEOUT=0 RESET=0
-
-==========================
-TC5 : INVALID REFRESH
-==========================
-[660] COUNT=20 TIMEOUT=0 RESET=0
-[700] COUNT=19 TIMEOUT=0 RESET=0
-[740] COUNT=18 TIMEOUT=0 RESET=0
-STATUS = 00000004
-
-========================
-TC6 : TIMEOUT
-========================
-[780] COUNT=17 TIMEOUT=0 RESET=0
-[820] COUNT=16 TIMEOUT=0 RESET=0
-[860] COUNT=15 TIMEOUT=0 RESET=0
-[900] COUNT=14 TIMEOUT=0 RESET=0
-[940] COUNT=13 TIMEOUT=0 RESET=0
-[980] COUNT=12 TIMEOUT=0 RESET=0
-[1020] COUNT=11 TIMEOUT=0 RESET=0
-[1060] COUNT=10 TIMEOUT=0 RESET=0
-[1100] COUNT=9 TIMEOUT=0 RESET=0
-[1140] COUNT=8 TIMEOUT=0 RESET=0
-[1180] COUNT=7 TIMEOUT=0 RESET=0
-TIMEOUT TEST COMPLETE
-
-TC7 : DEBUG FREEZE
-[1220] COUNT=6 TIMEOUT=0 RESET=0
-[1260] COUNT=5 TIMEOUT=0 RESET=0
-[1300] COUNT=4 TIMEOUT=0 RESET=0
-[1340] COUNT=3 TIMEOUT=0 RESET=0
-[1380] COUNT=2 TIMEOUT=0 RESET=0
-[1420] COUNT=1 TIMEOUT=0 RESET=0
-[1420] DEBUG HALT ASSERTED
-[1460] COUNT=0 TIMEOUT=0 RESET=0
-[1500] COUNT=0 TIMEOUT=0 RESET=0
-[1540] COUNT=0 TIMEOUT=0 RESET=0
+[340] COUNT=0 TIMEOUT=0 RESET=0
+[380] COUNT=0 TIMEOUT=0 RESET=0
+[420] COUNT=0 TIMEOUT=0 RESET=0
+[460] COUNT=0 TIMEOUT=0 RESET=0
+[500] COUNT=0 TIMEOUT=0 RESET=0
+[540] COUNT=0 TIMEOUT=0 RESET=0
+[580] COUNT=0 TIMEOUT=0 RESET=0
+[620] COUNT=0 TIMEOUT=0 RESET=0
+[660] COUNT=0 TIMEOUT=0 RESET=0
+[700] COUNT=0 TIMEOUT=0 RESET=0
+[740] COUNT=0 TIMEOUT=0 RESET=0
+[780] COUNT=20 TIMEOUT=0 RESET=0
+[820] COUNT=19 TIMEOUT=0 RESET=0
+[860] COUNT=18 TIMEOUT=0 RESET=0
+[900] COUNT=17 TIMEOUT=0 RESET=0
+[940] COUNT=16 TIMEOUT=0 RESET=0
+[980] COUNT=15 TIMEOUT=0 RESET=0
+[1020] COUNT=14 TIMEOUT=0 RESET=0
+[1060] COUNT=13 TIMEOUT=0 RESET=0
+[1100] COUNT=12 TIMEOUT=0 RESET=0
+[1140] COUNT=11 TIMEOUT=0 RESET=0
+[1180] COUNT=10 TIMEOUT=0 RESET=0
+[1220] COUNT=9 TIMEOUT=0 RESET=0
+[1260] COUNT=8 TIMEOUT=0 RESET=0
+[1300] COUNT=7 TIMEOUT=0 RESET=0
+[1340] COUNT=6 TIMEOUT=0 RESET=0
+[1380] COUNT=5 TIMEOUT=0 RESET=0
+[1420] COUNT=4 TIMEOUT=0 RESET=0
+[1460] COUNT=3 TIMEOUT=0 RESET=0
+[1500] COUNT=2 TIMEOUT=0 RESET=0
+[1540] COUNT=1 TIMEOUT=0 RESET=0
 [1580] COUNT=0 TIMEOUT=0 RESET=0
-[1620] COUNT=0 TIMEOUT=0 RESET=0
-[1620] DEBUG HALT DEASSERTED
-[1660] COUNT=0 TIMEOUT=0 RESET=0
-[1700] COUNT=0 TIMEOUT=1 RESET=1
+[1620] COUNT=0 TIMEOUT=1 RESET=1
+[1660] COUNT=0 TIMEOUT=0 RESET=1
+[1700] COUNT=0 TIMEOUT=0 RESET=1
 [1740] COUNT=0 TIMEOUT=0 RESET=1
 [1780] COUNT=0 TIMEOUT=0 RESET=1
 [1820] COUNT=0 TIMEOUT=0 RESET=1
-
-==========================
-TC8 : LOCK PROTECTION
-==========================
 [1860] COUNT=0 TIMEOUT=0 RESET=1
-Before Lock TIMEOUT = 20
 [1900] COUNT=0 TIMEOUT=0 RESET=1
 [1940] COUNT=0 TIMEOUT=0 RESET=1
-[1975] LOCKED=1 PSLVERR=0
 [1980] COUNT=0 TIMEOUT=0 RESET=1
-After Lock TIMEOUT = 20
 [2020] COUNT=0 TIMEOUT=0 RESET=1
-[2055] LOCKED=0
 [2060] COUNT=0 TIMEOUT=0 RESET=1
-[2100] COUNT=0 TIMEOUT=0 RESET=1
-After Unlock TIMEOUT = 100
-
-TC9 : Window Violation
-[2140] COUNT=0 TIMEOUT=0 RESET=1
-[2180] COUNT=0 TIMEOUT=0 RESET=1
-[2220] COUNT=0 TIMEOUT=0 RESET=1
-[2260] COUNT=0 TIMEOUT=0 RESET=1
-[2300] COUNT=0 TIMEOUT=0 RESET=1
-[2340] COUNT=0 TIMEOUT=0 RESET=1
-[2380] COUNT=0 TIMEOUT=0 RESET=1
-[2420] COUNT=0 TIMEOUT=0 RESET=1
-[2460] COUNT=0 TIMEOUT=0 RESET=1
-[2500] COUNT=0 TIMEOUT=0 RESET=1
-[2540] COUNT=0 TIMEOUT=0 RESET=1
-[2580] COUNT=0 TIMEOUT=0 RESET=1
-[2620] COUNT=0 TIMEOUT=0 RESET=1
-[2660] COUNT=0 TIMEOUT=0 RESET=1
-[2700] COUNT=0 TIMEOUT=0 RESET=1
-[2740] COUNT=0 TIMEOUT=0 RESET=1
-[2780] COUNT=0 TIMEOUT=0 RESET=1
-
-TC10 : Valid Window Refresh
 
 completed all test cases
-Simulation complete via $finish(1) at time 4080 NS + 0
-./wd_tb.sv:470     $finish;
+[2100] COUNT=0 TIMEOUT=0 RESET=1
+[2140] COUNT=0 TIMEOUT=0 RESET=1
+[2180] COUNT=0 TIMEOUT=0 RESET=1
+Simulation complete via $finish(1) at time 2185 NS + 0
+./wd_tb.sv:498     $finish;
 ncsim> exit
-TOOL:	irun(64)	15.20-s051: Exiting on Feb 13, 2019 at 22:46:01 IST  (total: 00:00:00)
+TOOL:	irun(64)	15.20-s051: Exiting on Feb 15, 2019 at 02:22:19 IST  (total: 00:00:01)

@@ -229,7 +229,7 @@ module tb_watchdog_timer;
 
     #50;
 
-     //--------------------------------------------------
+   /*  //--------------------------------------------------
     // TC1 : Reset Values
     //--------------------------------------------------
     $display("\n==========================");
@@ -461,7 +461,35 @@ module tb_watchdog_timer;
     apb_write(WDT_REFRESH_ADDR, 32'h0000005A);
 
     repeat(10) @(posedge wdt_clk); 
+    */
     
+presetn  = 1'b0;
+wdt_rstn = 1'b0;
+
+repeat(5) @(posedge pclk);
+
+presetn  = 1'b1;
+wdt_rstn = 1'b1;
+
+repeat(5) @(posedge pclk);
+repeat(5) @(posedge wdt_clk);
+
+apb_write(WDT_TIMEOUT_ADDR,32'd20);
+
+repeat(5) @(posedge wdt_clk);
+
+apb_write(WDT_CTRL_ADDR,32'h3); // enable + reset_en
+
+repeat(30) @(posedge wdt_clk);
+
+apb_read(WDT_BOOT_STATUS_ADDR,rdata);
+
+apb_write(WDT_BOOT_STATUS_ADDR,32'h1);
+
+repeat(5) @(posedge wdt_clk);
+
+apb_read(WDT_BOOT_STATUS_ADDR,rdata);
+
     $display("\ncompleted all test cases");
 
 
