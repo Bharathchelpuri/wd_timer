@@ -113,6 +113,7 @@ reg wdt_reset_cause;
 //--------------------------------------------------
 reg [XLEN-1:0] last_pc;
 reg prev_reset_wdt;
+reg prev_reset_wdt_pcl;
 reg recovery_boot_req;
 
 //--------------------------------------------------
@@ -123,11 +124,84 @@ reg [15:0] reset_counter;
 reg [1:0]  refresh_state;
 reg        refresh_toggle;
 reg        locked;
-reg        refresh_toggle_sync1;
-reg        refresh_toggle_sync2;
-reg        refresh_toggle_sync2_d;
+////////////////////////////////////////////////////
 
-wire       refresh_valid;
+reg timeout_flag_meta;
+reg timeout_flag_apb;
+
+reg window_violation_meta;
+reg window_violation_apb;
+
+reg reset_issued_meta;
+reg reset_issued_apb;
+
+reg prev_reset_wdt_meta;
+reg prev_reset_wdt_apb;
+/////////////////////////////////////////////
+reg enable_meta;
+reg enable_wdt;
+
+reg reset_en_meta;
+reg reset_en_wdt;
+
+reg window_en_meta;
+reg window_en_wdt;
+
+reg dbg_freeze_en_meta;
+reg dbg_freeze_en_wdt;
+
+//reg cpu_dbg_halt_meta;
+//reg cpu_dbg_halt_wdt;
+
+//reg dbg_freeze_meta;
+//reg dbg_freeze_wdt;
+
+reg cfg_sync1;
+reg cfg_sync2;
+reg cfg_sync2_d;
+
+////////////////////////////////////////////////
+
+reg [31:0] timeout_value_wdt;
+reg [31:0] window_value_wdt;
+reg [15:0] reset_cycles_wdt;
+//reg [3:0]  status_clear_req_wdt;
+
+//////////////////////////////////////////////
+
+reg  refresh_toggle_sync1;
+reg  refresh_toggle_sync2;
+reg  refresh_toggle_sync2_d;
+
+reg  clr_timeout_flag_sync1;
+reg  clr_timeout_flag_sync2;
+
+reg  clr_window_violation_sync1;
+reg  clr_window_violation_sync2;
+
+reg status_clear_sync1;
+reg status_clear_sync2;
+reg status_clear_sync2_d;
+
+//////////////////////////////////////
+
+reg counter_loaded;
+reg timeout_active;
+
+reg timeout_flag_wdt;
+reg window_violation_wdt;
+reg reset_issued_wdt;
+reg prev_reset_wdt_wdt;
+reg cfg_toggle;
+reg status_clear_toggle;
+reg [3:0] status_clear_req;
+
+////////////////////////////////////////////////////
+
+wire refresh_valid;
+wire cfg_update;
+wire status_clear_pulse;
+wire freeze_condition;
 
 //--------------------------------------------------
 // Reset Scope Output
@@ -146,49 +220,87 @@ always @(posedge pclk or negedge presetn) begin
         last_pc <= cpu_commit_pc;
 end
 
+
 //--------------------------------------------------
 // APB Write Logic
 //--------------------------------------------------
 always @(posedge pclk or negedge presetn) begin
     if (!presetn) begin
-        enable            <= 1'b0;
-        reset_en          <= 1'b1;
-        window_en         <= 1'b0;
-        dbg_freeze_en     <= 1'b1;
-        lock_en           <= 1'b0;
-        reset_scope_reg   <= 2'b11;
-        hart_id           <= 4'h0;
+        enable                <= 1'b0;
+        reset_en              <= 1'b1;
+        window_en             <= 1'b0;
+        dbg_freeze_en         <= 1'b1;
+        lock_en               <= 1'b0;
+        reset_scope_reg       <= 2'b11;
+        hart_id               <= 4'h0;
 
-        timeout_value     <= 32'h0000FFFF;
-        window_value      <= 32'h00000000;
-        reset_cycles      <= 16'd32;
+        timeout_value         <= 32'h0000FFFF;
+        window_value          <= 32'h00000000;
+        reset_cycles          <= 16'd32;
 
-        timeout_flag      <= 1'b0;
-        window_violation  <= 1'b0;
-        refresh_error     <= 1'b0;
-        reset_issued      <= 1'b0;
-        wdt_reset_cause   <= 1'b0;
+        refresh_error         <= 1'b0;
+        reset_issued          <= 1'b0;
 
-        prev_reset_wdt    <= 1'b0;
-        recovery_boot_req <= 1'b0;
+        prev_reset_wdt_pcl    <= 1'b0;
+        recovery_boot_req     <= 1'b0;
+        locked                <= 1'b0;
+        pslverr               <= 1'b0;
+	
+    	refresh_state	      <= 2'd0;
+        refresh_toggle 	      <= 1'b0;
+        cfg_toggle            <= 1'b0;
+        status_clear_req      <= 4'b0;
+        status_clear_toggle   <= 1'b0;
 
-        locked            <= 1'b0;
 
-        pslverr           <= 1'b0;
     end
     else begin
 
-        pslverr <= 1'b0;
+        pslverr 		 <= 1'b0;
+	
+	//-----------------------------------------------
+	//refresh logic
+	//-----------------------------------------------
+	
+        if (apb_write && paddr == WDT_REFRESH_ADDR) begin
+
+            case (refresh_state)
+
+                2'd0: begin
+                    if (pwdata == REFRESH_KEY1)
+                        refresh_state <= 2'd1;
+                    else begin
+                        refresh_error <= 1'b1;
+                        refresh_state <= 2'd0;
+                    end
+                end
+
+                2'd1: begin
+                    if (pwdata == REFRESH_KEY2) begin
+                        refresh_toggle <= ~refresh_toggle;
+                        refresh_state <= 2'd0;
+                    end
+                    else begin
+                        refresh_error <= 1'b1;
+                        refresh_state <= 2'd0;
+                    end
+                end
+
+                default: begin
+                    refresh_state <= 2'd0;
+                end
+
+            endcase
+        end
+
 
         //--------------------------------------------------
         // Status W1C
         //--------------------------------------------------
         if (apb_write && paddr == WDT_STATUS_ADDR) begin
-            if (pwdata[0]) timeout_flag     <= 1'b0;
-            if (pwdata[1]) window_violation <= 1'b0;
-            if (pwdata[2]) refresh_error    <= 1'b0;
-            if (pwdata[3]) reset_issued     <= 1'b0;
-        end
+                status_clear_req    <= pwdata[3:0];
+                status_clear_toggle <= ~status_clear_toggle;
+                end
 
         //--------------------------------------------------
         // Lock Register
@@ -199,7 +311,6 @@ always @(posedge pclk or negedge presetn) begin
             else if (pwdata == LOCK_KEY_LOCK)
                 locked <= 1'b1;
         end
-
         //--------------------------------------------------
         // Protected Writes
         //--------------------------------------------------
@@ -225,6 +336,7 @@ always @(posedge pclk or negedge presetn) begin
                 //------------------------------------------
                 WDT_TIMEOUT_ADDR: begin
                     timeout_value <= pwdata;
+                    cfg_toggle    <= ~cfg_toggle;
                 end
 
                 //------------------------------------------
@@ -232,15 +344,17 @@ always @(posedge pclk or negedge presetn) begin
                 //------------------------------------------
                 WDT_WINDOW_ADDR: begin
                     window_value <= pwdata;
+                    cfg_toggle   <= ~cfg_toggle;
                 end
 
                 //------------------------------------------
                 // Boot Status Register
                 //------------------------------------------
                 WDT_BOOT_STATUS_ADDR: begin
-                    if (pwdata[0])
-                        prev_reset_wdt <= 1'b0;
+                    if (pwdata[0]) begin
+                        prev_reset_wdt_pcl <= 1'b0;
                         recovery_boot_req <= pwdata[1];
+                        end
                 end
 
                 //------------------------------------------
@@ -248,6 +362,7 @@ always @(posedge pclk or negedge presetn) begin
                 //------------------------------------------
                 WDT_RESET_WIDTH_ADDR: begin
                     reset_cycles <= pwdata[15:0];
+                    cfg_toggle   <= ~cfg_toggle;
                 end
 
                 default: begin
@@ -268,13 +383,18 @@ always @(posedge pclk or negedge presetn) begin
                 default: begin
                 end
             endcase
+	
         end
     end
 end
 
+
+
+
 //--------------------------------------------------
 // APB Read Logic
 //--------------------------------------------------
+
 always @(*) begin
 
     prdata = 32'h0;
@@ -310,10 +430,10 @@ always @(*) begin
         // Status Register
         //----------------------------------------------
         WDT_STATUS_ADDR: begin
-            prdata[0] = timeout_flag;
-            prdata[1] = window_violation;
+            prdata[0] = timeout_flag_apb;
+            prdata[1] = window_violation_apb;
             prdata[2] = refresh_error;
-            prdata[3] = reset_issued;
+            prdata[3] = reset_issued_apb;
         end
 
         //----------------------------------------------
@@ -339,7 +459,7 @@ always @(*) begin
         // Boot Status Register
         //----------------------------------------------
         WDT_BOOT_STATUS_ADDR: begin
-            prdata[0] = prev_reset_wdt;
+            prdata[0] = prev_reset_wdt_apb;
             prdata[1] = recovery_boot_req;
         end
 
@@ -355,81 +475,151 @@ always @(*) begin
     endcase
 end
 
-//--------------------------------------------------
-// Refresh Sequence Detection
-//--------------------------------------------------
-always @(posedge pclk or negedge presetn) begin
+////////////////////////////////////////////////////////////////////////
 
-    if (!presetn) begin
-        refresh_state <= 2'd0;
-        refresh_toggle <= 1'b0;
+always @(posedge pclk or negedge presetn) begin
+    if(!presetn) begin
+
+        timeout_flag_meta      <= 0;
+        timeout_flag_apb       <= 0;
+
+        window_violation_meta  <= 0;
+        window_violation_apb   <= 0;
+
+        reset_issued_meta      <= 0;
+        reset_issued_apb       <= 0;
+
+        prev_reset_wdt_meta    <= 0;
+        prev_reset_wdt_apb     <= 0;
     end
     else begin
 
-       // refresh_toggle <= 1'b0;
+        timeout_flag_meta     <= timeout_flag_wdt;
+        timeout_flag_apb      <= timeout_flag_meta;
 
-        if (apb_write && paddr == WDT_REFRESH_ADDR) begin
+        window_violation_meta <= window_violation_wdt;
+        window_violation_apb  <= window_violation_meta;
 
-            case (refresh_state)
+        reset_issued_meta     <= reset_issued_wdt;
+        reset_issued_apb      <= reset_issued_meta;
 
-                2'd0: begin
-                    if (pwdata == REFRESH_KEY1)
-                        refresh_state <= 2'd1;
-                    else begin
-                        refresh_error <= 1'b1;
-                        refresh_state <= 2'd0;
-                    end
-                end
-
-                2'd1: begin
-                    if (pwdata == REFRESH_KEY2) begin
-                        refresh_toggle <= ~refresh_toggle;
-                        refresh_state <= 2'd0;
-                    end
-                    else begin
-                        refresh_error <= 1'b1;
-                        refresh_state <= 2'd0;
-                    end
-                end
-
-                default: begin
-                    refresh_state <= 2'd0;
-                end
-
-            endcase
-        end
+        prev_reset_wdt_meta   <= prev_reset_wdt_wdt;
+        prev_reset_wdt_apb    <= prev_reset_wdt_meta;
     end
 end
+
+/////////////////////////////////////////////////////////////////////////////
+
+//--------------------------------------------------
+// Watchdog Counter Logic
+//--------------------------------------------------
+assign freeze_condition = dbg_freeze_en_wdt & (cpu_dbg_halt | dbg_freeze);
+
+assign refresh_valid = refresh_toggle_sync2 ^ refresh_toggle_sync2_d;
+
+assign cfg_update = cfg_sync2 ^ cfg_sync2_d;
+
+assign status_clear_pulse = status_clear_sync2 ^ status_clear_sync2_d;
+
+
+///////////////////////////////////////////////////////////////////////////////
 
 //------------------------------------------
 //synchronizer block
 //-------------------------------------------
 always@(posedge wdt_clk or negedge wdt_rstn) begin
 if(!wdt_rstn) begin
-        refresh_toggle_sync1   <= 1'b0;
-        refresh_toggle_sync2   <= 1'b0;
-        refresh_toggle_sync2_d <= 1'b0;
+            refresh_toggle_sync1   <= 1'b0;
+            refresh_toggle_sync2   <= 1'b0;
+            refresh_toggle_sync2_d <= 1'b0;
+
+            enable_meta            <= 1'b0;
+            enable_wdt             <= 1'b0;
+
+            reset_en_meta          <= 1'b0;
+            reset_en_wdt           <= 1'b0;
+
+            window_en_meta         <= 1'b0;
+            window_en_wdt          <= 1'b0;
+
+            dbg_freeze_en_meta     <= 1'b0;
+            dbg_freeze_en_wdt      <= 1'b0;
+
+            status_clear_sync1     <= 1'b0;
+            status_clear_sync2     <= 1'b0;
+            status_clear_sync2_d   <= 1'b0;
+
+            cfg_sync1              <= 1'b0;
+            cfg_sync2              <= 1'b0;
+            cfg_sync2_d            <= 1'b0;
+
+            //cpu_dbg_halt_meta    <= 1'b0;
+            // cpu_dbg_halt_wdt    <= 1'b0;
+
+            //dbg_freeze_meta      <= 1'b0;
+            // dbg_freeze_wdt      <= 1'b0;
+	
     end
     else begin
 
-            refresh_toggle_sync1   <= refresh_toggle;
-            refresh_toggle_sync2   <= refresh_toggle_sync1;
-            refresh_toggle_sync2_d <= refresh_toggle_sync2;
-        end   
+           refresh_toggle_sync1   <= refresh_toggle;
+           refresh_toggle_sync2   <= refresh_toggle_sync1;
+           refresh_toggle_sync2_d <= refresh_toggle_sync2;
 
+           enable_meta            <= enable;
+           enable_wdt             <= enable_meta;
+
+           reset_en_meta          <= reset_en;
+           reset_en_wdt           <= reset_en_meta;
+
+           window_en_meta         <= window_en;
+           window_en_wdt          <= window_en_meta;
+
+           dbg_freeze_en_meta     <= dbg_freeze_en;
+           dbg_freeze_en_wdt      <= dbg_freeze_en_meta;
+
+           cfg_sync1              <= cfg_toggle;
+           cfg_sync2              <= cfg_sync1;
+           cfg_sync2_d            <= cfg_sync2;
+
+           status_clear_sync1     <= status_clear_toggle;
+           status_clear_sync2     <= status_clear_sync1;
+           status_clear_sync2_d   <= status_clear_sync2;
+
+           //cpu_dbg_halt_meta    <= cpu_dbg_halt;
+           //cpu_dbg_halt_wdt     <= cpu_dbg_halt_meta;
+
+           //dbg_freeze_meta      <= dbg_freeze;
+           //dbg_freeze_wdt       <= dbg_freeze_meta;
+    
+        end   
 end
 
-assign refresh_valid = refresh_toggle_sync2 ^ refresh_toggle_sync2_d;
+///////////////////////////////////////////////////////////////////////////////
 
+always@(posedge wdt_clk or negedge wdt_rstn) begin
+    if(!wdt_rstn) begin
+            timeout_value_wdt       <= 32'h0000FFFF;
+            window_value_wdt        <= 32'h00000000;
+            reset_cycles_wdt        <= 16'd32;
+            //status_clear_req_wdt    <= 4'b0;
 
-//--------------------------------------------------
-// Watchdog Counter Logic
-//--------------------------------------------------
-wire freeze_condition;
-assign freeze_condition = dbg_freeze_en & (cpu_dbg_halt | dbg_freeze);
+        end
 
-reg counter_loaded;
-reg timeout_active;
+        else begin
+            if(cfg_update) begin
+                timeout_value_wdt   <= timeout_value;
+                window_value_wdt    <= window_value;
+                reset_cycles_wdt    <= reset_cycles;
+                end
+          //  if(status_clear_pulse) begin
+             //   status_clear_req_wdt <= status_clear_req;
+           //     end
+
+            end
+end
+
+////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge wdt_clk or negedge wdt_rstn) begin
 
@@ -438,25 +628,48 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         watchdog_counter <= 32'h0;
         wdt_timeout      <= 1'b0;
         wdt_reset        <= 1'b0;
+
         reset_counter    <= 16'h0;
         counter_loaded   <= 1'b0;
         timeout_active   <= 1'b0;
 
+	    wdt_reset_cause  <= 1'b0;
+	    timeout_flag_wdt	 <= 1'b0;
+	    window_violation_wdt <= 1'b0;
+
+        reset_issued_wdt     <= 1'b0;
+        prev_reset_wdt_wdt   <= 1'b0;
+
+       
     end
     else begin
 
         //----------------------------------------------
         // Default
         //----------------------------------------------
-        wdt_timeout     <= 1'b0;
-       // counter_loaded  <= 1'b0;
+        wdt_timeout      <= 1'b0;
+
+        if(status_clear_pulse) begin
+            if(status_clear_req[0])
+                timeout_flag_wdt <= 1'b0;
+
+             if(status_clear_req[1])
+                 window_violation_wdt <= 1'b0;
+
+             if(status_clear_req[2])
+                 refresh_error <= 1'b0;
+
+             if(status_clear_req[3])
+                 reset_issued_wdt <=1'b0;
+                 
+            end
 
         //----------------------------------------------
         // Reset Pulse Generation
         //----------------------------------------------
         if (wdt_reset) begin
 
-            if (reset_counter >= reset_cycles) begin
+            if (reset_counter >= reset_cycles_wdt) begin
                 wdt_reset    <= 1'b0;
                 reset_counter <= 16'h0;
             end
@@ -468,13 +681,13 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         //----------------------------------------------
         // Watchdog Operation
         //----------------------------------------------
-        if (enable && !freeze_condition) begin
+        if (enable_wdt && !freeze_condition) begin
 
             //------------------------------------------
             // Initial Load
             //------------------------------------------
             if (!counter_loaded) begin
-                watchdog_counter <= timeout_value;
+                watchdog_counter <= timeout_value_wdt;
                 counter_loaded   <= 1'b1;
                 end
 
@@ -486,20 +699,20 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
                 //--------------------------------------
                 // Window Violation
                 //--------------------------------------
-                if (window_en && (watchdog_counter > window_value)) begin
+                if (window_en_wdt && (watchdog_counter > window_value_wdt)) begin
 
-                    window_violation <= 1'b1;
+                    window_violation_wdt <= 1'b1;
 
-                    if (reset_en) begin
+                    if (reset_en_wdt) begin
                         wdt_reset      <= 1'b1;
-                        reset_issued   <= 1'b1;
-                        prev_reset_wdt <= 1'b1;
+                        reset_issued_wdt   <= 1'b1;
+                        prev_reset_wdt_wdt <= 1'b1;
                     end
                 end
                 else begin
-                    watchdog_counter <= timeout_value;
+                    watchdog_counter <= timeout_value_wdt;
                     timeout_active   <= 1'b0;
-                    timeout_flag     <= 1'b0;
+                    timeout_flag_wdt     <= 1'b0;
                 end
             end
 
@@ -516,20 +729,20 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
             else if (!timeout_active) begin
 
                 timeout_active  <= 1'b1;
-                timeout_flag    <= 1'b1;
+                timeout_flag_wdt    <= 1'b1;
                 wdt_timeout     <= 1'b1;
                 wdt_reset_cause <= 1'b1;
 
-                if (reset_en) begin
+                if (reset_en_wdt) begin
                     wdt_reset      <= 1'b1;
-                    reset_issued   <= 1'b1;
-                    prev_reset_wdt <= 1'b1;
+                    reset_issued_wdt   <= 1'b1;
+                    prev_reset_wdt_wdt <= 1'b1;
                 end
             end
+
         end
     end
 end
-
 endmodule
 
 
