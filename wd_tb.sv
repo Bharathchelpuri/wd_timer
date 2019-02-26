@@ -1,7 +1,7 @@
 
 module tb_watchdog_timer;
 
-  parameter ADDR_WIDTH = 32;
+  parameter ADDR_WIDTH = 8;
   parameter DATA_WIDTH = 32;
   parameter XLEN       = 32;
 
@@ -13,9 +13,9 @@ module tb_watchdog_timer;
   reg                     psel;
   reg                     penable;
   reg                     pwrite;
-  reg  [31:0]             paddr;
-  reg  [31:0]             pwdata;
-  wire [31:0]             prdata;
+  reg  [ADDR_WIDTH-1:0]             paddr;
+  reg  [DATA_WIDTH-1:0]             pwdata;
+  wire [DATA_WIDTH-1:0]             prdata;
   wire                    pready;
   wire                    pslverr;
 
@@ -101,6 +101,8 @@ module tb_watchdog_timer;
     wdt_clk = 0;
     forever #20 wdt_clk = ~wdt_clk; //25MHz
   end
+
+  reg [31:0] rd_data;
 
   //------------------------------------------
   // APB WRITE
@@ -462,7 +464,7 @@ module tb_watchdog_timer;
 
     repeat(10) @(posedge wdt_clk); 
     */
-    
+/*    
 presetn  = 1'b0;
 wdt_rstn = 1'b0;
 
@@ -489,6 +491,96 @@ apb_write(WDT_BOOT_STATUS_ADDR,32'h1);
 repeat(5) @(posedge wdt_clk);
 
 apb_read(WDT_BOOT_STATUS_ADDR,rdata);
+//--------------------------------------------------
+// TC14 : CLEAR ALL FLAGS
+//--------------------------------------------------
+
+$display("\nTC14 : CLEAR ALL FLAGS");
+
+// Reset DUT
+presetn = 0;
+repeat(5) @(posedge pclk);
+presetn = 1;
+repeat(5) @(posedge pclk);
+
+// Create timeout
+apb_write(WDT_TIMEOUT_ADDR,32'd5);
+apb_write(WDT_CTRL_ADDR,32'h0000_0003);
+
+repeat(20) @(posedge wdt_clk);
+
+// Force window violation also
+apb_write(WDT_TIMEOUT_ADDR,32'd100);
+apb_write(WDT_WINDOW_ADDR ,32'd50);
+apb_write(WDT_CTRL_ADDR   ,32'h0000_0007);
+
+repeat(10) @(posedge wdt_clk);
+
+refresh_wdt();
+
+repeat(10) @(posedge wdt_clk);
+
+
+// Clear all flags
+apb_write(WDT_STATUS_ADDR,32'h0000_0007);
+
+repeat(5) @(posedge wdt_clk); 
+//--------------------------------------------------
+// TC12 : WINDOW_VIOLATION W1C CLEAR
+//--------------------------------------------------
+
+$display("\nTC12 : WINDOW_VIOLATION W1C CLEAR");
+
+// Reset DUT
+presetn = 0;
+repeat(5) @(posedge pclk);
+presetn = 1;
+repeat(5) @(posedge pclk);
+
+apb_write(WDT_TIMEOUT_ADDR,32'd100);
+apb_write(WDT_WINDOW_ADDR ,32'd50);
+
+// enable + reset_en + window_en
+apb_write(WDT_CTRL_ADDR,32'h0000_0007);
+
+// Refresh too early
+repeat(10) @(posedge wdt_clk);
+
+refresh_wdt();
+
+repeat(10) @(posedge wdt_clk);
+
+
+// Clear window violation
+apb_write(WDT_STATUS_ADDR,32'h0000_0002);
+
+repeat(5) @(posedge wdt_clk);
+*/
+
+//--------------------------------------------------
+// TC15 : WDT Counter Read CDC Verification
+//--------------------------------------------------
+
+$display("\n==================================");
+$display("TC15 : WDT Counter Read CDC");
+$display("==================================");
+
+// Configure timeout
+apb_write(WDT_TIMEOUT_ADDR,32'd20);
+
+// Enable WDT
+apb_write(WDT_CTRL_ADDR,32'h0000_0003);
+
+// Read counter multiple times
+repeat(25) begin
+
+    repeat(2) @(posedge pclk);
+
+    apb_read(WDT_COUNT_ADDR, rd_data);
+
+    //$display("[%0t] Counter Read = %0d", $time);
+
+end
 
     $display("\ncompleted all test cases");
 
@@ -496,6 +588,7 @@ apb_read(WDT_BOOT_STATUS_ADDR,rdata);
     #100;
          
     $finish;
+    
 
   end
  

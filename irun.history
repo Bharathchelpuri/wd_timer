@@ -1,1 +1,0 @@
-s1(15Feb2019:02:22:18):  irun -access +rwc watchdog_timer.sv wd_tb.sv 
