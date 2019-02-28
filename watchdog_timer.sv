@@ -11,9 +11,9 @@ module watchdog_timer #(
     input  wire                     psel,
     input  wire                     penable,
     input  wire                     pwrite,
-    input  wire [ADDR_WIDTH-1:0]    paddr,
+    input  wire [ADDR_WIDTH-1:0]    paddr,  //
     input  wire [DATA_WIDTH-1:0]    pwdata,
-    output reg  [DATA_WIDTH-1:0]    prdata,
+    output reg  [DATA_WIDTH-1:0]    prdata,   //
     output wire                     pready,
     output reg                      pslverr,
 
@@ -49,10 +49,10 @@ module watchdog_timer #(
 assign pready = 1'b1;
 
 wire apb_write;
-//wire apb_read;
+wire apb_read;
 
 assign apb_write = psel & penable & pwrite;
-//assign apb_read  = psel & penable & (~pwrite);
+assign apb_read  = psel & penable & (~pwrite);
 
 //--------------------------------------------------
 // Register Address Map
@@ -168,16 +168,6 @@ wire [15:0] reset_cycles_wdt;
 
 //////////////////////////////////////////////
 
-//reg  refresh_toggle_sync1;
-//reg  refresh_toggle_sync2;
-//reg  refresh_toggle_sync2_d;
-
-//reg prev_reset_wdt_sync1;
-//reg prev_reset_wdt_sync2;
-//reg prev_reset_wdt_sync2_d;
-
-//////////////////////////////////////
-
 reg counter_loaded;
 reg timeout_active;
 
@@ -186,6 +176,9 @@ reg window_violation_wdt;
 reg reset_issued_wdt;
 reg prev_reset_wdt_wdt;
 reg cfg_toggle;
+reg snapshort_toggle;
+wire snapshort_toggle_wdt;
+reg ctrl_toggle;
 
 ////////////////////////////////////////////////////
 
@@ -193,6 +186,9 @@ wire refresh_valid;
 //wire cfg_update;
 wire freeze_condition;
 wire prev_reset_wdt_pulse;
+wire cpu_commit_valid_pcl;
+//wire cpu_commit_pc_pcl;
+
 
 //--------------------------------------------------
 // Reset Scope Output
@@ -207,7 +203,7 @@ end
 always @(posedge pclk or negedge presetn) begin
     if (!presetn)
         last_pc <= {XLEN{1'b0}};
-    else if (cpu_commit_valid)
+    else if (cpu_commit_valid_pcl)
         last_pc <= cpu_commit_pc;
 end
 
@@ -216,6 +212,7 @@ end
 reg status_toggle1;
 reg status_toggle2;
 reg status_toggle3;
+reg [31:0] counter_snapshort;
 
 wire clr_f1;
 wire clr_f2;
@@ -248,11 +245,11 @@ always @(posedge pclk or negedge presetn) begin
     	refresh_state	      <= 2'd0;
         refresh_toggle 	      <= 1'b0;
         cfg_toggle            <= 1'b0;
+
     	status_toggle1	      <= 1'b0;
  	    status_toggle2	      <= 1'b0;
 	    status_toggle3	      <= 1'b0;
-
-
+        ctrl_toggle           <= 1'b0;
 
 
     end
@@ -331,6 +328,7 @@ always @(posedge pclk or negedge presetn) begin
                     lock_en         <= pwdata[4];
                     reset_scope_reg <= pwdata[7:6];
                     hart_id         <= pwdata[11:8];
+                    ctrl_toggle     <= ~ctrl_toggle;
                 end
 
                 //------------------------------------------
@@ -437,8 +435,10 @@ always @(*) begin
         //----------------------------------------------
         // Count Register
         //----------------------------------------------
-        WDT_COUNT_ADDR:
-            prdata = watchdog_counter;
+        WDT_COUNT_ADDR: begin
+            //snapshort_toggle = ~snapshort_toggle;        
+            prdata = counter_snapshort;
+            end
 
         //----------------------------------------------
         // Reset Cause Register
@@ -471,6 +471,14 @@ always @(*) begin
             prdata = 32'h0;
 
     endcase
+end
+
+
+always @(posedge pclk or negedge presetn) begin
+    if (!presetn)
+        snapshort_toggle <= 1'b0;
+    else if (apb_read && (paddr == WDT_COUNT_ADDR))
+        snapshort_toggle <= ~snapshort_toggle;
 end
 
 ////////////////////////////////////////////////////////////////////////
@@ -559,102 +567,6 @@ else begin
 end
 end
 */
-//------------------------------------------
-//synchronizer block
-//-------------------------------------------
-/*
-
-always@(posedge wdt_clk or negedge wdt_rstn) begin
-if(!wdt_rstn) begin
-            refresh_toggle_sync1   <= 1'b0;
-            refresh_toggle_sync2   <= 1'b0;
-            refresh_toggle_sync2_d <= 1'b0;
-
-            enable_meta            <= 1'b0;
-            enable_wdt             <= 1'b0;
-
-            reset_en_meta          <= 1'b0;
-            reset_en_wdt           <= 1'b0;
-
-            window_en_meta         <= 1'b0;
-            window_en_wdt          <= 1'b0;
-
-            dbg_freeze_en_meta     <= 1'b0;
-            dbg_freeze_en_wdt      <= 1'b0;
-
-            cfg_sync1              <= 1'b0;
-            cfg_sync2              <= 1'b0;
-            cfg_sync2_d            <= 1'b0;
-
-	    prev_reset_wdt_sync1   <= 1'b0;
-	    prev_reset_wdt_sync2   <= 1'b0; 
-	    prev_reset_wdt_sync2_d <= 1'b0; 
-            
-
-            //cpu_dbg_halt_meta    <= 1'b0;
-            // cpu_dbg_halt_wdt    <= 1'b0;
-
-            //dbg_freeze_meta      <= 1'b0;
-            // dbg_freeze_wdt      <= 1'b0;
-	
-    end
-    else begin
-
-           refresh_toggle_sync1   <= refresh_toggle;
-           refresh_toggle_sync2   <= refresh_toggle_sync1;
-           refresh_toggle_sync2_d <= refresh_toggle_sync2;
-
-           enable_meta            <= enable;
-           enable_wdt             <= enable_meta;
-
-           reset_en_meta          <= reset_en;
-           reset_en_wdt           <= reset_en_meta;
-
-           window_en_meta         <= window_en;
-           window_en_wdt          <= window_en_meta;
-
-           dbg_freeze_en_meta     <= dbg_freeze_en;
-           dbg_freeze_en_wdt      <= dbg_freeze_en_meta;
-
-           cfg_sync1              <= cfg_toggle;
-           cfg_sync2              <= cfg_sync1;
-           cfg_sync2_d            <= cfg_sync2;
-
-
-           prev_reset_wdt_sync1   <= prev_reset_wdt_pcl;
-	   prev_reset_wdt_sync2   <= prev_reset_wdt_sync1;
-           prev_reset_wdt_sync2_d <= prev_reset_wdt_sync2;
-
-           //cpu_dbg_halt_meta    <= cpu_dbg_halt;
-           //cpu_dbg_halt_wdt     <= cpu_dbg_halt_meta;
-
-           //dbg_freeze_meta      <= dbg_freeze;
-           //dbg_freeze_wdt       <= dbg_freeze_meta;
-    
-        end   
-end
-
-///////////////////////////////////////////////////////////////////////////////
-
-always@(posedge wdt_clk or negedge wdt_rstn) begin
-    if(!wdt_rstn) begin
-            timeout_value_wdt       <= 32'h0000FFFF;
-            window_value_wdt        <= 32'h00000000;
-            reset_cycles_wdt        <= 16'd32;
-
-        end
-
-        else begin
-            if(cfg_update) begin
-                timeout_value_wdt   <= timeout_value;
-                window_value_wdt    <= window_value;
-                reset_cycles_wdt    <= reset_cycles;
-                end
-
-            end
-end
-*/
-
 ////////////////////////////////////////////////////////////////////////////////
 
 always @(posedge wdt_clk or negedge wdt_rstn) begin
@@ -675,6 +587,7 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
 
         reset_issued_wdt     <= 1'b0;
         prev_reset_wdt_wdt   <= 1'b0;
+        counter_loaded       <= 32'b0;
 
        
     end
@@ -686,7 +599,6 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
         wdt_timeout      <= 1'b0;
 	
 
-       // if(status_clear_pulse) begin
             if(clr_f1) begin
                 timeout_flag_wdt <= 1'b0;
 		end
@@ -701,6 +613,11 @@ always @(posedge wdt_clk or negedge wdt_rstn) begin
 
             if(prev_reset_wdt_pulse)
                 prev_reset_wdt_wdt <= 1'b0;
+
+
+            if (snapshort_toggle_wdt) begin
+                counter_snapshort <=  watchdog_counter;
+                end
 
         //----------------------------------------------
         // Reset Pulse Generation
@@ -836,7 +753,14 @@ watchdog_sync watchdog_sync_instance (
         //.cfg_update_sync            (cfg_update),
         .timeout_value_sync         (timeout_value),
         .window_value_sync          (window_value),
-        .reset_cycles_sync          (reset_cycles)
+        .reset_cycles_sync          (reset_cycles),
+        .snapshort_toggle_sync      (snapshort_toggle),
+        .snapshort_toggle_wdt_sync  (snapshort_toggle_wdt),
+        .ctrl_toggle_sync           (ctrl_toggle),
+        //.cpu_commit_pc_pcl_sync     (cpu_commit_pc_pcl),
+        .cpu_commit_valid_pcl_sync  (cpu_commit_valid__pcl),
+        .cpu_commit_valid_sync      (cpu_commit_valid)
+        //.cpu_commit_pc_sync         (cpu_commit_pc)
 
     );
 
