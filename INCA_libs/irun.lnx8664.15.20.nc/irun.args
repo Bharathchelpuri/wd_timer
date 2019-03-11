@@ -1,0 +1,9 @@
+//
+// File created by:  irun
+// Do not modify this file
+//
+-access
++rwc
+watchdog_sync.sv
+watchdog_timer.sv
+wd_tb.sv

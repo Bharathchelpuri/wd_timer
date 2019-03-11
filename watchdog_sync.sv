@@ -33,14 +33,15 @@ module watchdog_sync (
     input    cpu_dbg_halt_sync,
     input    dbg_freeze_sync,
     input    snapshort_toggle_sync,
-    //input    cpu_commit_pc_sync,
+    input    counter_toggle_sync,
     input    cpu_commit_valid_sync,
 
 
-   // input          cfg_update_sync,  
     input   [31:0]   timeout_value_sync,
     input   [31:0]   window_value_sync,
     input   [15:0]   reset_cycles_sync,
+
+///////////////////////////////////////////////////
 
     output reg   	  timeout_flag_apb_sync,                        
     output reg   	  window_violation_apb_sync, 
@@ -63,7 +64,7 @@ module watchdog_sync (
     output reg    dbg_freeze_wdt_sync,
     output reg    snapshort_toggle_wdt_sync,
 
-   // output reg    cpu_commit_pc_pcl_sync,
+    output reg    counter_toggle_pcl_sync,
     output reg    cpu_commit_valid_pcl_sync,
 
     output reg   [31:0]  timeout_value_wdt_sync,
@@ -85,21 +86,20 @@ reg     cpu_dbg_halt_meta;
 reg     dbg_freeze_meta;
 ////////////////////////////////////
 
-reg  refresh_toggle_sync1;  
-reg  refresh_toggle_sync2;  
-reg  refresh_toggle_sync2_d;
-                
-//reg  cpu_commit_pc_meta;           
-               
-reg  reset_en_meta;         
-                
-reg  window_en_meta;        
-                
-reg  cpu_commit_valid_meta;  
+reg refresh_toggle_sync1;  
+reg refresh_toggle_sync2;  
+reg refresh_toggle_sync2_d;
 
+reg ctrl_toggle_wdt_sync1;
+reg ctrl_toggle_wdt_sync2;
+reg ctrl_toggle_wdt_sync2_d;
+
+reg ctrl_toggle_pulse;              
+reg counter_toggle_meta;                          
+reg reset_en_meta;                         
+reg window_en_meta;                       
+reg cpu_commit_valid_meta;  
 reg snapshort_toggle_meta;
-
-//reg snapshort_toggle_wdt_sync;
                 
 reg  cfg_sync1;             
 reg  cfg_sync2;             
@@ -132,8 +132,11 @@ always @(posedge pclk or negedge presetn) begin
 	    wdt_reset_cause_meta        <= 1'b0;
     	wdt_reset_cause_apb_sync    <= 1'b0;
 
-        cpu_commit_valid_meta       <=  1'b0;
-        cpu_commit_valid_pcl_sync   <=  1'b0;
+        cpu_commit_valid_meta       <= 1'b0;
+        cpu_commit_valid_pcl_sync   <= 1'b0;
+
+        counter_toggle_meta         <= 1'b0;
+        counter_toggle_pcl_sync     <= 1'b0;
 
     end
     else begin
@@ -156,9 +159,8 @@ always @(posedge pclk or negedge presetn) begin
         cpu_commit_valid_meta      <= cpu_commit_valid_sync;
         cpu_commit_valid_pcl_sync  <= cpu_commit_valid_meta;
 
-        //cpu_commit_pc_meta         <= cpu_commit_pc_sync;
-        //cpu_commit_pc_pcl_sync     <= cpu_commit_pc_meta;
-
+        counter_toggle_meta        <= counter_toggle_sync;
+        counter_toggle_pcl_sync    <= counter_toggle_meta;
 	
     end
 end
@@ -195,17 +197,11 @@ if(!wdt_rstn) begin
             refresh_toggle_sync2   <= 1'b0;
             refresh_toggle_sync2_d <= 1'b0;
 
-            //enable_meta            <= 1'b0;
-            //enable_wdt_sync        <= 1'b0;
-
             reset_en_meta          <= 1'b0;
             reset_en_wdt_sync      <= 1'b0;
 
             window_en_meta         <= 1'b0;
             window_en_wdt_sync     <= 1'b0;
-
-            //dbg_freeze_en_meta     <= 1'b0;
-            //dbg_freeze_en_wdt_sync <= 1'b0;
 
             cfg_sync1              <= 1'b0;
             cfg_sync2              <= 1'b0;
@@ -246,6 +242,10 @@ if(!wdt_rstn) begin
 	       prev_reset_wdt_sync2   <= prev_reset_wdt_sync1;
            prev_reset_wdt_sync2_d <= prev_reset_wdt_sync2;
 
+           ctrl_toggle_wdt_sync1   <= ctrl_toggle_sync;
+           ctrl_toggle_wdt_sync2   <= ctrl_toggle_wdt_sync1;
+           ctrl_toggle_wdt_sync2_d <= ctrl_toggle_wdt_sync2; 
+
            cpu_dbg_halt_meta      <= cpu_dbg_halt_sync;
            cpu_dbg_halt_wdt_sync  <= cpu_dbg_halt_meta;
 
@@ -266,7 +266,7 @@ if(!wdt_rstn) begin
     dbg_freeze_en_wdt_sync     <= 1'b0;
     end
 
-    else if (ctrl_toggle_sync) begin
+    else if (ctrl_toggle_pulse) begin
         enable_wdt_sync         <= enable_sync;
         dbg_freeze_en_wdt_sync  <= dbg_freeze_en_sync;
         
@@ -300,6 +300,8 @@ assign refresh_valid_sync = refresh_toggle_sync2 ^ refresh_toggle_sync2_d;
 assign cfg_update_sync = cfg_sync2 ^ cfg_sync2_d;
 
 assign prev_reset_wdt_pulse_sync = prev_reset_wdt_sync2 ^ prev_reset_wdt_sync2_d;
+
+assign ctrl_toggle_pulse = ctrl_toggle_wdt_sync2_d ^ ctrl_toggle_wdt_sync2;
 
 assign clr_f1_sync = dly_f1 ^ sync_f1[1];
 
